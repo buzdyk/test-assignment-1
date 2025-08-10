@@ -5,7 +5,7 @@
         <CardTitle>Service Frequency</CardTitle>
       </CardHeader>
       <CardContent>
-        <div class="space-y-4">
+        <div class="my-4">
           <RadioGroup>
             <RadioGroupItem
               id="weekly"
@@ -63,8 +63,8 @@
             <h4 class="font-medium mb-4 text-gray-900">Custom Schedule Options</h4>
             
             <!-- Days Selection -->
-            <div class="space-y-4">
-              <div>
+            <div>
+              <div class="mb-6">
                 <Label class="text-sm font-medium mb-3 block">Select Days:</Label>
                 <div class="grid grid-cols-3 gap-2">
                   <Checkbox
@@ -79,7 +79,7 @@
               </div>
 
               <!-- Time Options -->
-              <div class="space-y-3">
+              <div>
                 <Label class="text-sm font-medium text-gray-900 block mb-3">Time Constraints:</Label>
                 
                 <RadioGroup>
@@ -165,6 +165,13 @@
               </div>
             </div>
           </div>
+          
+          <!-- Save Button -->
+          <div class="mt-6 flex justify-start">
+            <Button @click="handleSave">
+              Save
+            </Button>
+          </div>
         </div>
       </CardContent>
     </Card>
@@ -194,6 +201,7 @@ import RadioGroup from './ui/RadioGroup.vue'
 import RadioGroupItem from './ui/RadioGroupItem.vue'
 import Checkbox from './ui/Checkbox.vue'
 import Label from './ui/Label.vue'
+import Button from './ui/Button.vue'
 
 const props = defineProps({
   scheduleConfig: {
@@ -297,6 +305,11 @@ const removeTimeWindow = (index) => {
   if (options.value.timeWindows.length > 1) {
     options.value.timeWindows.splice(index, 1)
   }
+}
+
+const handleSave = () => {
+  console.log('Saving configuration:', jsonOutput.value)
+  // Add your save logic here
 }
 
 const parseScheduleConfig = (configString) => {
