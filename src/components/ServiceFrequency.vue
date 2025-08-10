@@ -66,57 +66,99 @@
             <div class="space-y-4">
               <div>
                 <Label class="text-sm font-medium mb-3 block">Select Days:</Label>
-                <div class="grid grid-cols-2 gap-2">
+                <div class="grid grid-cols-3 gap-2">
                   <Checkbox
                     v-for="day in days"
                     :key="day.value"
                     :id="day.value"
                     :label="day.label"
-                    :modelValue="customOptions.days.includes(day.value)"
+                    :modelValue="options.days.includes(day.value)"
                     @update:modelValue="handleDayToggle(day.value, $event)"
                   />
                 </div>
               </div>
 
-              <!-- Time Window Options -->
+              <!-- Time Options -->
               <div class="space-y-3">
-                <Checkbox
-                  id="time-windows"
-                  label="Specify time window(s)"
-                  :modelValue="customOptions.hasTimeWindows"
-                  @update:modelValue="handleTimeWindowToggle"
-                />
+                <Label class="text-sm font-medium text-gray-900 block mb-3">Time Constraints:</Label>
                 
-                <div v-if="customOptions.hasTimeWindows" class="ml-6">
-                  <Label for="time-window-input" class="text-sm text-gray-600">
-                    Enter time ranges (e.g., 06:30–07:30,15:00-17:00):
-                  </Label>
-                  <Input
-                    id="time-window-input"
-                    v-model="customOptions.timeWindowsInput"
-                    placeholder="06:30–07:30,15:00-17:00"
-                    class="mt-1"
-                  />
+                <RadioGroup>
+                  <RadioGroupItem
+                    id="no-time-constraint"
+                    name="timeConstraint"
+                    value="none"
+                    :checked="options.timeConstraint === 'none'"
+                    @update:modelValue="handleTimeConstraintChange('none')"
+                  >
+                    No time constraint
+                  </RadioGroupItem>
+                  
+                  <RadioGroupItem
+                    id="time-window"
+                    name="timeConstraint"
+                    value="window"
+                    :checked="options.timeConstraint === 'window'"
+                    @update:modelValue="handleTimeConstraintChange('window')"
+                  >
+                    Specify time window(s)
+                  </RadioGroupItem>
+                  
+                  <RadioGroupItem
+                    id="exact-time"
+                    name="timeConstraint"
+                    value="exact"
+                    :checked="options.timeConstraint === 'exact'"
+                    @update:modelValue="handleTimeConstraintChange('exact')"
+                  >
+                    Set exact time
+                  </RadioGroupItem>
+                </RadioGroup>
+                
+                <!-- Time Window Input -->
+                <div v-if="options.timeConstraint === 'window'" class="ml-6 mt-3">
+                  <div class="grid grid-cols-3 gap-4 mb-3">
+                    <div class="text-xs font-medium text-gray-700">From</div>
+                    <div class="text-xs font-medium text-gray-700">To</div>
+                    <div></div>
+                  </div>
+                  
+                  <div v-for="(window, index) in options.timeWindows" :key="index" class="grid grid-cols-3 gap-4 items-center mb-2">
+                    <Vue3Timepicker
+                      v-model="window.from"
+                      format="HH:mm"
+                      placeholder=" "
+                    />
+                    <Vue3Timepicker
+                      v-model="window.to"
+                      format="HH:mm"
+                      placeholder=" "
+                    />
+                    <button
+                      v-if="options.timeWindows.length > 1"
+                      @click="removeTimeWindow(index)"
+                      class="text-xs text-red-600 hover:text-red-800"
+                      type="button"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                  
+                  <button
+                    @click="addTimeWindow"
+                    class="mt-2 text-xs text-blue-600 hover:text-blue-800"
+                    type="button"
+                  >
+                    + Add time window
+                  </button>
                 </div>
-              </div>
-
-              <!-- Exact Time Option -->
-              <div class="space-y-3">
-                <Checkbox
-                  id="exact-time"
-                  label="Set exact time"
-                  :modelValue="customOptions.hasExactTime"
-                  @update:modelValue="handleExactTimeToggle"
-                />
                 
-                <div v-if="customOptions.hasExactTime" class="ml-6">
-                  <Label for="exact-time-input" class="text-sm text-gray-600">
-                    Enter specific time:
-                  </Label>
-                  <Input
-                    id="exact-time-input"
-                    v-model="customOptions.exactTime"
-                    type="time"
+                <!-- Exact Time Input -->
+                <div v-if="options.timeConstraint === 'exact'" class="ml-6 mt-3">
+                  <Label class="text-xs text-gray-500 mr-4">Specific time</Label>
+                  <Vue3Timepicker
+                    v-model="options.exactTime"
+                    format="HH:mm"
+                    placeholder=" "
                     class="mt-1"
                   />
                 </div>
@@ -130,7 +172,7 @@
     <!-- JSON Output Display -->
     <Card>
       <CardHeader>
-        <CardTitle class="text-lg text-gray-900">JSON Configuration</CardTitle>
+        <CardTitle class="text-lg text-gray-900">JSON</CardTitle>
       </CardHeader>
       <CardContent>
         <div class="bg-gray-100 p-4 rounded-md">
@@ -143,6 +185,7 @@
 
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
+import Vue3Timepicker from 'vue3-timepicker'
 import Card from './ui/Card.vue'
 import CardHeader from './ui/CardHeader.vue'
 import CardContent from './ui/CardContent.vue'
@@ -150,7 +193,6 @@ import CardTitle from './ui/CardTitle.vue'
 import RadioGroup from './ui/RadioGroup.vue'
 import RadioGroupItem from './ui/RadioGroupItem.vue'
 import Checkbox from './ui/Checkbox.vue'
-import Input from './ui/Input.vue'
 import Label from './ui/Label.vue'
 
 const props = defineProps({
@@ -171,11 +213,10 @@ const days = [
 ]
 
 const selectedFrequency = ref('fortnightly')
-const customOptions = ref({
+const options = ref({
   days: [],
-  hasTimeWindows: false,
-  timeWindowsInput: '',
-  hasExactTime: false,
+  timeConstraint: 'none', // 'none', 'window', 'exact'
+  timeWindows: [{ from: '', to: '' }],
   exactTime: ''
 })
 
@@ -185,19 +226,21 @@ const jsonOutput = computed(() => {
   }
 
   if (selectedFrequency.value === 'custom') {
-    config.customOptions = {
-      days: customOptions.value.days
+    config.options = {
+      days: options.value.days
     }
 
-    if (customOptions.value.hasTimeWindows && customOptions.value.timeWindowsInput) {
-      config.customOptions.timeWindows = customOptions.value.timeWindowsInput
-        .split(',')
-        .map(window => window.trim())
-        .filter(window => window.length > 0)
+    if (options.value.timeConstraint === 'window') {
+      const validWindows = options.value.timeWindows
+        .filter(window => window.from && window.to)
+      
+      if (validWindows.length > 0) {
+        config.options.windows = validWindows
+      }
     }
 
-    if (customOptions.value.hasExactTime && customOptions.value.exactTime) {
-      config.customOptions.exactTime = customOptions.value.exactTime
+    if (options.value.timeConstraint === 'exact' && options.value.exactTime) {
+      config.options.exactTime = options.value.exactTime
     }
   }
 
@@ -209,11 +252,10 @@ const handleFrequencyChange = (frequency) => {
   
   // Reset custom options when switching away from custom
   if (frequency !== 'custom') {
-    customOptions.value = {
+    options.value = {
       days: [],
-      hasTimeWindows: false,
-      timeWindowsInput: '',
-      hasExactTime: false,
+      timeConstraint: 'none',
+      timeWindows: [{ from: '', to: '' }],
       exactTime: ''
     }
   }
@@ -221,28 +263,39 @@ const handleFrequencyChange = (frequency) => {
 
 const handleDayToggle = (day, checked) => {
   if (checked) {
-    if (!customOptions.value.days.includes(day)) {
-      customOptions.value.days.push(day)
+    if (!options.value.days.includes(day)) {
+      options.value.days.push(day)
     }
   } else {
-    const index = customOptions.value.days.indexOf(day)
+    const index = options.value.days.indexOf(day)
     if (index > -1) {
-      customOptions.value.days.splice(index, 1)
+      options.value.days.splice(index, 1)
     }
   }
 }
 
-const handleTimeWindowToggle = (checked) => {
-  customOptions.value.hasTimeWindows = checked
-  if (!checked) {
-    customOptions.value.timeWindowsInput = ''
+const handleTimeConstraintChange = (constraint) => {
+  options.value.timeConstraint = constraint
+  
+  // Clear/initialize time values when switching constraint types
+  if (constraint === 'none') {
+    options.value.timeWindows = [{ from: '', to: '' }]
+    options.value.exactTime = ''
+  } else if (constraint === 'window') {
+    options.value.timeWindows = [{ from: '', to: '' }]
+    options.value.exactTime = ''
+  } else if (constraint === 'exact') {
+    options.value.timeWindows = [{ from: '', to: '' }]
   }
 }
 
-const handleExactTimeToggle = (checked) => {
-  customOptions.value.hasExactTime = checked
-  if (!checked) {
-    customOptions.value.exactTime = ''
+const addTimeWindow = () => {
+  options.value.timeWindows.push({ from: '', to: '' })
+}
+
+const removeTimeWindow = (index) => {
+  if (options.value.timeWindows.length > 1) {
+    options.value.timeWindows.splice(index, 1)
   }
 }
 
@@ -255,19 +308,27 @@ const parseScheduleConfig = (configString) => {
     const config = JSON.parse(configString)
     selectedFrequency.value = config.frequency || 'fortnightly'
     
-    if (config.customOptions && selectedFrequency.value === 'custom') {
-      customOptions.value.days = config.customOptions.days || []
+    if (config.options && selectedFrequency.value === 'custom') {
+      options.value.days = config.options.days || []
       
-      if (config.customOptions.timeWindows) {
-        customOptions.value.hasTimeWindows = true
-        customOptions.value.timeWindowsInput = Array.isArray(config.customOptions.timeWindows) 
-          ? config.customOptions.timeWindows.join(',')
-          : config.customOptions.timeWindows
-      }
-      
-      if (config.customOptions.exactTime) {
-        customOptions.value.hasExactTime = true
-        customOptions.value.exactTime = config.customOptions.exactTime
+      if (config.options.windows) {
+        options.value.timeConstraint = 'window'
+        
+        if (Array.isArray(config.options.windows)) {
+          options.value.timeWindows = config.options.windows.filter(
+            window => typeof window === 'object' && window.from && window.to
+          )
+          
+          // Ensure at least one empty window if none are valid
+          if (options.value.timeWindows.length === 0) {
+            options.value.timeWindows = [{ from: '', to: '' }]
+          }
+        }
+      } else if (config.options.exactTime) {
+        options.value.timeConstraint = 'exact'
+        options.value.exactTime = config.options.exactTime
+      } else {
+        options.value.timeConstraint = 'none'
       }
     }
   } catch (error) {
